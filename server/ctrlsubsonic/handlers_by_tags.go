@@ -248,10 +248,36 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	if err != nil {
 		return spec.NewError(10, "please provide an `id` parameter")
 	}
+
+	sub := spec.NewResponse()
+	sub.ArtistInfoTwo = &spec.ArtistInfo{}
+
+	artistFolder := &db.Album{}
+	err = c.DB.
+		Select("parent.*").
+		Joins("JOIN albums parent ON parent.id=albums.parent_id").
+		Where("albums.tag_artist_id=?", id.Value).
+		Find(&artistFolder).
+		Error
+	if err != nil {
+		return spec.NewError(0, "fetching artist folder: %v", err)
+	}
+
+	if artistFolder.Cover != "" {
+		u, _ := params.Get("u")
+		s, _ := params.Get("s")
+		t, _ := params.Get("t")
+		v, _ := params.Get("v")
+		c, _ := params.Get("c")
+		serverURL := "http://gonic"
+
+		sub.ArtistInfoTwo.SmallImageURL = fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s&size=%d", serverURL, id.Value, u, s, t, v, c, artistSmallSize)
+		sub.ArtistInfoTwo.MediumImageURL = fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s&size=%d", serverURL, id.Value, u, s, t, v, c, artistMediumSize)
+		sub.ArtistInfoTwo.LargeImageURL = fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s&size=%d", serverURL, id.Value, u, s, t, v, c, artistLargeSize)
+	}
+
 	apiKey, _ := c.DB.GetSetting("lastfm_api_key")
 	if apiKey == "" {
-		sub := spec.NewResponse()
-		sub.ArtistInfoTwo = &spec.ArtistInfo{}
 		return sub
 	}
 	artist := &db.Artist{}
@@ -266,20 +292,23 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	if err != nil {
 		return spec.NewError(0, "fetching artist info: %v", err)
 	}
-	sub := spec.NewResponse()
+
 	sub.ArtistInfoTwo = &spec.ArtistInfo{
 		Biography:     info.Bio.Summary,
 		MusicBrainzID: info.MBID,
 		LastFMURL:     info.URL,
 	}
-	for _, image := range info.Image {
-		switch image.Size {
-		case "small":
-			sub.ArtistInfoTwo.SmallImageURL = image.Text
-		case "medium":
-			sub.ArtistInfoTwo.MediumImageURL = image.Text
-		case "large":
-			sub.ArtistInfoTwo.LargeImageURL = image.Text
+
+	if artistFolder.Cover == "" {
+		for _, image := range info.Image {
+			switch image.Size {
+			case "small":
+				sub.ArtistInfoTwo.SmallImageURL = image.Text
+			case "medium":
+				sub.ArtistInfoTwo.MediumImageURL = image.Text
+			case "large":
+				sub.ArtistInfoTwo.LargeImageURL = image.Text
+			}
 		}
 	}
 	count := params.GetOrInt("count", 20)
