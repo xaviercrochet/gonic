@@ -65,8 +65,12 @@ func streamUpdateStats(dbc *db.DB, userID, albumID int) {
 }
 
 const (
-	coverDefaultSize = 600
-	coverCacheFormat = "png"
+	coverDefaultSize  = 600
+	coverCacheFormat  = "png"
+	artistSmallSize   = 64
+	artistMediumSize  = 126
+	artistLargeSize   = 256
+	artistCacheFormat = "png"
 )
 
 var (
@@ -78,6 +82,8 @@ func coverGetPath(dbc *db.DB, podcastPath string, id specid.ID) (string, error) 
 	switch id.Type {
 	case specid.Album:
 		return coverGetPathAlbum(dbc, id.Value)
+	case specid.Artist:
+		return coverGetPathArtist(dbc, id.Value)
 	case specid.Podcast:
 		return coverGetPathPodcast(dbc, podcastPath, id.Value)
 	case specid.PodcastEpisode:
@@ -141,6 +147,28 @@ func coverGetPathPodcastEpisode(dbc *db.DB, podcastPath string, id int) (string,
 		return "", errCoverEmpty
 	}
 	return path.Join(podcastPath, podcast.ImagePath), nil
+}
+
+func coverGetPathArtist(dbc *db.DB, id int) (string, error) {
+	folder := &db.Album{}
+	err := dbc.DB.
+		Select("parent.*").
+		Joins("JOIN albums parent ON parent.id=albums.parent_id").
+		Where("albums.tag_artist_id=?", id).
+		Find(&folder).
+		Error
+	if err != nil {
+		return "", fmt.Errorf("select album: %w", err)
+	}
+	if folder.Cover == "" {
+		return "", errCoverEmpty
+	}
+	return path.Join(
+		folder.RootDir,
+		folder.LeftPath,
+		folder.RightPath,
+		folder.Cover,
+	), nil
 }
 
 func coverScaleAndSave(absPath, cachePath string, size int) error {
