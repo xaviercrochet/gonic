@@ -48,6 +48,7 @@ type Controller struct {
 	DB          *db.DB
 	Scanner     *scanner.Scanner
 	ProxyPrefix string
+	ServerURL   string
 }
 
 // Path returns a URL path with the proxy prefix included

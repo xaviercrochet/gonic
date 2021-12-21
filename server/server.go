@@ -35,6 +35,7 @@ type Options struct {
 	GenreSplit     string
 	HTTPLog        bool
 	JukeboxEnabled bool
+	ServerURL      string
 }
 
 type Server struct {
@@ -59,6 +60,7 @@ func New(opts Options) (*Server, error) {
 		DB:          opts.DB,
 		ProxyPrefix: opts.ProxyPrefix,
 		Scanner:     scanner,
+		ServerURL:   opts.ServerURL,
 	}
 
 	// router with common wares for admin / subsonic

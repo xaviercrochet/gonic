@@ -39,6 +39,7 @@ func main() {
 	confGenreSplit := set.String("genre-split", "\n", "character or string to split genre tag data on (optional)")
 	confHTTPLog := set.Bool("http-log", true, "http request logging (optional)")
 	confShowVersion := set.Bool("version", false, "show gonic version")
+	confServerURL := set.String("server-url", "http://gonic", "the url the server is behind, used for redirecting to itself, default http://gonic (optional)")
 
 	var confMusicPaths musicPaths
 	set.Var(&confMusicPaths, "music-path", "path to music")
@@ -119,6 +120,7 @@ func main() {
 		PodcastPath:    *confPodcastPath,
 		HTTPLog:        *confHTTPLog,
 		JukeboxEnabled: *confJukeboxEnabled,
+		ServerURL:      *confServerURL,
 	})
 	if err != nil {
 		log.Panicf("error creating server: %v\n", err)

@@ -268,12 +268,13 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 		s, _ := params.Get("s")
 		t, _ := params.Get("t")
 		v, _ := params.Get("v")
-		c, _ := params.Get("c")
-		serverURL := "http://gonic"
+		cParam, _ := params.Get("c")
+		serverURL := c.ServerURL
 
-		sub.ArtistInfoTwo.SmallImageURL = fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s&size=%d", serverURL, id.Value, u, s, t, v, c, artistSmallSize)
-		sub.ArtistInfoTwo.MediumImageURL = fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s&size=%d", serverURL, id.Value, u, s, t, v, c, artistMediumSize)
-		sub.ArtistInfoTwo.LargeImageURL = fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s&size=%d", serverURL, id.Value, u, s, t, v, c, artistLargeSize)
+		baseImageURL := fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s", serverURL, id.Value, u, s, t, v, cParam)
+		sub.ArtistInfoTwo.SmallImageURL = fmt.Sprintf("%s&size=%d", baseImageURL, artistSmallSize)
+		sub.ArtistInfoTwo.MediumImageURL = fmt.Sprintf("%s&size=%d", baseImageURL, artistMediumSize)
+		sub.ArtistInfoTwo.LargeImageURL = fmt.Sprintf("%s&size=%d", baseImageURL, artistLargeSize)
 	}
 
 	apiKey, _ := c.DB.GetSetting("lastfm_api_key")
