@@ -460,7 +460,7 @@ func isCover(name string) bool {
 		"album.png", "album.jpg", "album.jpeg",
 		"albumart.png", "albumart.jpg", "albumart.jpeg",
 		"front.png", "front.jpg", "front.jpeg",
-		"arist.png", "arist.jpg", "arist.jpeg":
+		"artist.png", "artist.jpg", "artist.jpeg":
 		return true
 	default:
 		return false
