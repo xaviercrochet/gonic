@@ -4,6 +4,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"strconv"
 	"strings"
 
 	"github.com/jinzhu/gorm"
@@ -248,37 +250,10 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	if err != nil {
 		return spec.NewError(10, "please provide an `id` parameter")
 	}
-
-	sub := spec.NewResponse()
-	sub.ArtistInfoTwo = &spec.ArtistInfo{}
-
-	artistFolder := &db.Album{}
-	err = c.DB.
-		Select("parent.*").
-		Joins("JOIN albums parent ON parent.id=albums.parent_id").
-		Where("albums.tag_artist_id=?", id.Value).
-		Find(&artistFolder).
-		Error
-	if err != nil {
-		return spec.NewError(0, "fetching artist folder: %v", err)
-	}
-
-	if artistFolder.Cover != "" {
-		u, _ := params.Get("u")
-		s, _ := params.Get("s")
-		t, _ := params.Get("t")
-		v, _ := params.Get("v")
-		cParam, _ := params.Get("c")
-		serverURL := c.ServerURL
-
-		baseImageURL := fmt.Sprintf("%s/rest/getCoverArt?id=ar-%d&u=%s&s=%s&t=%s&v=%s&c=%s", serverURL, id.Value, u, s, t, v, cParam)
-		sub.ArtistInfoTwo.SmallImageURL = fmt.Sprintf("%s&size=%d", baseImageURL, artistSmallSize)
-		sub.ArtistInfoTwo.MediumImageURL = fmt.Sprintf("%s&size=%d", baseImageURL, artistMediumSize)
-		sub.ArtistInfoTwo.LargeImageURL = fmt.Sprintf("%s&size=%d", baseImageURL, artistLargeSize)
-	}
-
 	apiKey, _ := c.DB.GetSetting("lastfm_api_key")
 	if apiKey == "" {
+		sub := spec.NewResponse()
+		sub.ArtistInfoTwo = &spec.ArtistInfo{}
 		return sub
 	}
 	artist := &db.Artist{}
@@ -289,29 +264,28 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	if errors.Is(err, gorm.ErrRecordNotFound) {
 		return spec.NewError(70, "artist with id `%s` not found", id)
 	}
+
 	info, err := lastfm.ArtistGetInfo(apiKey, artist)
 	if err != nil {
 		return spec.NewError(0, "fetching artist info: %v", err)
 	}
-
+	sub := spec.NewResponse()
 	sub.ArtistInfoTwo = &spec.ArtistInfo{
 		Biography:     info.Bio.Summary,
 		MusicBrainzID: info.MBID,
 		LastFMURL:     info.URL,
 	}
-
-	if artistFolder.Cover == "" {
-		for _, image := range info.Image {
-			switch image.Size {
-			case "small":
-				sub.ArtistInfoTwo.SmallImageURL = image.Text
-			case "medium":
-				sub.ArtistInfoTwo.MediumImageURL = image.Text
-			case "large":
-				sub.ArtistInfoTwo.LargeImageURL = image.Text
-			}
+	for _, image := range info.Image {
+		switch image.Size {
+		case "small":
+			sub.ArtistInfoTwo.SmallImageURL = image.Text
+		case "medium":
+			sub.ArtistInfoTwo.MediumImageURL = image.Text
+		case "large":
+			sub.ArtistInfoTwo.LargeImageURL = image.Text
 		}
 	}
+
 	count := params.GetOrInt("count", 20)
 	inclNotPresent := params.GetOrBool("includeNotPresent", false)
 	for i, similarInfo := range info.Similar.Artists {
@@ -340,6 +314,23 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 		sub.ArtistInfoTwo.SimilarArtist = append(
 			sub.ArtistInfoTwo.SimilarArtist, similar)
 	}
+
+	guessedArtistFolder := &db.Album{}
+	err = c.DB.
+		Select("parent.*").
+		Joins("JOIN albums parent ON parent.id=albums.parent_id").
+		Where("albums.tag_artist_id=?", id.Value).
+		Find(&guessedArtistFolder).
+		Error
+	if err != nil {
+		return spec.NewError(0, "finding artist folder: %v", err)
+	}
+	if guessedArtistFolder.Cover != "" {
+		sub.ArtistInfoTwo.SmallImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 64)
+		sub.ArtistInfoTwo.MediumImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 126)
+		sub.ArtistInfoTwo.LargeImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 256)
+	}
+
 	return sub
 }
 
@@ -390,4 +381,17 @@ func (c *Controller) ServeGetSongsByGenre(r *http.Request) *spec.Response {
 		sub.TracksByGenre.List[i] = spec.NewTrackByTags(track, track.Album)
 	}
 	return sub
+}
+
+func (c *Controller) genAlbumCoverURL(r *http.Request, folder *db.Album, size int) string {
+	coverURL, _ := url.Parse(c.BaseURL(r))
+	coverURL.Path = c.Path("/rest/getCoverArt")
+
+	id := specid.ID{Type: specid.Album, Value: folder.ID}
+	query := r.URL.Query()
+	query.Set("id", id.String())
+	query.Set("size", strconv.Itoa(size))
+	coverURL.RawQuery = query.Encode()
+
+	return coverURL.String()
 }
