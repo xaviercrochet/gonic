@@ -250,12 +250,32 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	if err != nil {
 		return spec.NewError(10, "please provide an `id` parameter")
 	}
+
+	sub := spec.NewResponse()
+	sub.ArtistInfoTwo = &spec.ArtistInfo{}
+
+	guessedArtistFolder := &db.Album{}
+	err = c.DB.
+		Select("parent.*").
+		Joins("JOIN albums parent ON parent.id=albums.parent_id").
+		Where("albums.tag_artist_id=?", id.Value).
+		Find(&guessedArtistFolder).
+		Error
+	if err != nil {
+		return spec.NewError(0, "finding artist folder: %v", err)
+	}
+
+	if guessedArtistFolder.Cover != "" {
+		sub.ArtistInfoTwo.SmallImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 64)
+		sub.ArtistInfoTwo.MediumImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 126)
+		sub.ArtistInfoTwo.LargeImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 256)
+	}
+
 	apiKey, _ := c.DB.GetSetting("lastfm_api_key")
 	if apiKey == "" {
-		sub := spec.NewResponse()
-		sub.ArtistInfoTwo = &spec.ArtistInfo{}
 		return sub
 	}
+
 	artist := &db.Artist{}
 	err = c.DB.
 		Where("id=?", id.Value).
@@ -269,20 +289,21 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	if err != nil {
 		return spec.NewError(0, "fetching artist info: %v", err)
 	}
-	sub := spec.NewResponse()
-	sub.ArtistInfoTwo = &spec.ArtistInfo{
-		Biography:     info.Bio.Summary,
-		MusicBrainzID: info.MBID,
-		LastFMURL:     info.URL,
-	}
-	for _, image := range info.Image {
-		switch image.Size {
-		case "small":
-			sub.ArtistInfoTwo.SmallImageURL = image.Text
-		case "medium":
-			sub.ArtistInfoTwo.MediumImageURL = image.Text
-		case "large":
-			sub.ArtistInfoTwo.LargeImageURL = image.Text
+
+	sub.ArtistInfoTwo.Biography = info.Bio.Summary
+	sub.ArtistInfoTwo.MusicBrainzID = info.MBID
+	sub.ArtistInfoTwo.LastFMURL = info.URL
+
+	if guessedArtistFolder.Cover == "" {
+		for _, image := range info.Image {
+			switch image.Size {
+			case "small":
+				sub.ArtistInfoTwo.SmallImageURL = image.Text
+			case "medium":
+				sub.ArtistInfoTwo.MediumImageURL = image.Text
+			case "large":
+				sub.ArtistInfoTwo.LargeImageURL = image.Text
+			}
 		}
 	}
 
@@ -313,22 +334,6 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 		similar.AlbumCount = artist.AlbumCount
 		sub.ArtistInfoTwo.SimilarArtist = append(
 			sub.ArtistInfoTwo.SimilarArtist, similar)
-	}
-
-	guessedArtistFolder := &db.Album{}
-	err = c.DB.
-		Select("parent.*").
-		Joins("JOIN albums parent ON parent.id=albums.parent_id").
-		Where("albums.tag_artist_id=?", id.Value).
-		Find(&guessedArtistFolder).
-		Error
-	if err != nil {
-		return spec.NewError(0, "finding artist folder: %v", err)
-	}
-	if guessedArtistFolder.Cover != "" {
-		sub.ArtistInfoTwo.SmallImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 64)
-		sub.ArtistInfoTwo.MediumImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 126)
-		sub.ArtistInfoTwo.LargeImageURL = c.genAlbumCoverURL(r, guessedArtistFolder, 256)
 	}
 
 	return sub
