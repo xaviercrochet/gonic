@@ -308,8 +308,10 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 	var artists []*db.Artist
 
 	err = c.DB.
-		Select("artists.* ").
+		Select("artists.*, count(albums.id) album_count").
 		Where("artists.name IN (?) ", similarArtistNames).
+		Joins("LEFT JOIN albums ON artists.id=albums.tag_artist_id").
+		Group("artists.id").
 		Find(&artists).
 		Limit(count).
 		Error
@@ -329,7 +331,7 @@ func (c *Controller) ServeGetArtistInfoTwo(r *http.Request) *spec.Response {
 		}
 
 		similar.Name = artist.Name
-		similar.AlbumCount = artist.AlbumCount
+		similar.AlbumCount = 1
 		sub.ArtistInfoTwo.SimilarArtist[i] = similar
 	}
 
