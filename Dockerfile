@@ -13,10 +13,11 @@ COPY go.mod .
 COPY go.sum .
 RUN go mod download
 COPY . .
-RUN GOOS=linux go build -o gonic cmd/gonic/gonic.go
+ARG TARGETOS TARGETARCH
+RUN GOOS=$TARGETOS GOARCH=$TARGETARCH go build -o gonic cmd/gonic/gonic.go
 
 FROM alpine:3.15
-LABEL org.opencontainers.image.source https://github.com/sentriz/gonic
+LABEL org.opencontainers.image.source https://github.com/xaviercrochet/gonic
 RUN apk add -U --no-cache \
     ffmpeg \
     ca-certificates \
